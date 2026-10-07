@@ -121,8 +121,8 @@ bind = SUPER SHIFT, G, exec, omarchy-shell ram.adguard toggleService
   read back from systemd or AdGuard is matched against a short allowlist or an
   address pattern before it is shown, and every text in the panel renders as
   plain text.
-- **Privileges**: none beyond your own user. No `sudo`, no `pkexec`; `systemctl`
-  is only ever called with `--user`.
+- **Privileges**: none beyond your own user. No sudo or pkexec is required;
+  `systemctl` is only ever called with `--user`.
 - **Files**: none. It writes nothing, not even inside its own directory.
 - **Network**: none of its own. AdGuard's proxy is AdGuard's business.
 - **Background**: nothing. The state is polled from a timer in the shell, one
