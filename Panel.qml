@@ -127,6 +127,7 @@ Panel {
             iconOpacity: adguard.active ? 1.0 : 0.5
             iconComponent: Component {
               Text {
+                textFormat: Text.PlainText
                 text: widget.icon()
                 color: adguard.failed ? widget.urgent : hero.foreground
                 font.family: hero.fontFamily
@@ -167,6 +168,7 @@ Panel {
               width: column.width
               height: Style.space(16)
               Text {
+                textFormat: Text.PlainText
                 text: modelData.label
                 color: widget.dim
                 font.family: widget.fontFamily
@@ -175,7 +177,8 @@ Panel {
                 anchors.verticalCenter: parent.verticalCenter
               }
               Text {
-                text: modelData.value
+                textFormat: Text.PlainText
+                text: adguard.plain(modelData.value, 64)
                 color: widget.foreground
                 font.family: widget.fontFamily
                 font.pixelSize: Style.font.caption
@@ -208,12 +211,14 @@ Panel {
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
             Text {
+              textFormat: Text.PlainText
               text: "Start at boot"
               color: widget.foreground
               font.family: widget.fontFamily
               font.pixelSize: Style.font.body
             }
             Text {
+              textFormat: Text.PlainText
               width: parent.width
               text: adguard.startsAtBoot
                     ? "The proxy starts with your session."
@@ -268,9 +273,10 @@ Panel {
 
         // ---------- Footnotes ----------
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           visible: adguard.actionStatus !== "" || adguard.lastError !== ""
-          text: adguard.lastError !== "" ? adguard.lastError : adguard.actionStatus
+          text: adguard.plain(adguard.lastError !== "" ? adguard.lastError : adguard.actionStatus, 160)
           color: adguard.lastError !== "" ? widget.urgent : widget.dim
           font.family: widget.fontFamily
           font.pixelSize: Style.font.caption
@@ -278,9 +284,10 @@ Panel {
         }
 
         Text {
+          textFormat: Text.PlainText
           width: parent.width
           visible: adguard.checked && !adguard.unitFound
-          text: "No user unit named " + adguard.unit + " was found. Create it, or change the unit name in this widget's settings."
+          text: "No user unit named " + adguard.plain(adguard.unit, 72) + " was found. Create it, or change the unit name in this widget's settings."
           color: widget.dim
           font.family: widget.fontFamily
           font.pixelSize: Style.font.caption

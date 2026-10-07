@@ -1,31 +1,67 @@
-#!/usr/bin/env bash
-# Prints one JSON object describing the adguard-cli user service and proxy.
-# Called by the bar widget's Service.qml on a timer and after every action.
+#!/usr/bin/bash
+# Prints one JSON object describing the adguard-cli user unit and proxy.
+# Called by Service.qml on a timer and after every action.
+#
+# Everything here runs as the user: `systemctl --user` and `adguard-cli
+# status`. Fixed executable paths, a byte cap on every child's output, and a
+# deadline on the one command that talks to another process.
+set -uo pipefail
+LC_ALL=C
+export LC_ALL
+
+MAX=8192
 unit="${1:-adguard-cli.service}"
+# Unit names are plain: letters, digits, and a few separators, never option-shaped.
+case "$unit" in
+  -*|''|*[!A-Za-z0-9_.@:-]*) echo 'invalid unit name' >&2; exit 2 ;;
+esac
+[ "${#unit}" -le 72 ] && [[ "$unit" == *.service ]] || { echo 'invalid unit name' >&2; exit 2; }
 
-active=$(systemctl --user is-active "$unit" 2>/dev/null || true)
-enabled=$(systemctl --user is-enabled "$unit" 2>/dev/null || true)
+# A failing or missing command yields an empty string and the field below
+# reports "unknown"; the panel then says so rather than guessing.
+bounded() { /usr/bin/timeout -k 2 -- 10 "$@" 2>/dev/null | /usr/bin/head -c $((MAX + 1)); }
+
+active=$(bounded /usr/bin/systemctl --user is-active -- "$unit")
+enabled=$(bounded /usr/bin/systemctl --user is-enabled -- "$unit")
+# systemd answers with one word; anything else is treated as unknown.
+case "$active" in active|inactive|failed|activating|deactivating|reloading) ;; *) active=unknown ;; esac
+case "$enabled" in enabled|disabled|static|masked|linked|not-found|alias|indirect|generated|transient|enabled-runtime) ;; *) enabled=unknown ;; esac
 unit_found=true
-if [[ -z "$enabled" || "$enabled" == "not-found" ]]; then
-  unit_found=false
-fi
+[ "$enabled" = not-found ] || [ "$enabled" = unknown ] && unit_found=false
 
-status=$(adguard-cli status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true)
+# AdGuard installs its launcher at a fixed place; nothing is resolved via PATH.
+cli=""
+for candidate in /usr/local/bin/adguard-cli /usr/bin/adguard-cli; do
+  [ -x "$candidate" ] && { cli="$candidate"; break; }
+done
+status=""
+if [ -n "$cli" ]; then
+  status=$(bounded "$cli" status | /usr/bin/sed 's/\x1b\[[0-9;]*m//g')
+  [ "${#status}" -le "$MAX" ] || status=""
+fi
 proxy_running=false
 [[ "$status" == *"is running"* ]] && proxy_running=true
-http=$(grep -oE 'HTTP proxy is listening on [^ ]+' <<<"$status" | awk '{print $NF}')
-socks=$(grep -oE 'SOCKS5 proxy is listening on [^ ]+' <<<"$status" | awk '{print $NF}')
-auto=$(grep -oE 'System-wide automatic filtering is [a-z]+' <<<"$status" | awk '{print $NF}')
-dns=$(grep -oE 'System-wide DNS filtering is [a-z]+' <<<"$status" | awk '{print $NF}')
 
-jq -cn \
-  --arg unit "$unit" \
-  --arg active "${active:-unknown}" \
-  --arg enabled "${enabled:-unknown}" \
-  --argjson unitFound "$unit_found" \
-  --argjson proxyRunning "$proxy_running" \
-  --arg http "$http" --arg socks "$socks" \
-  --arg auto "$auto" --arg dns "$dns" \
+# Only well-formed host:port values make it out; the panel prints them as-is.
+address_after() {
+  local value
+  value=$(/usr/bin/grep -oE "$1 [^ ]{1,64}" <<<"$status" | /usr/bin/head -n 1 | /usr/bin/awk '{print $NF}')
+  [[ "$value" =~ ^[][0-9A-Fa-f.:]{1,45}:[0-9]{1,5}$ ]] && printf '%s' "$value"
+}
+word_after() {
+  local value
+  value=$(/usr/bin/grep -oE "$1 [a-z]{1,16}" <<<"$status" | /usr/bin/head -n 1 | /usr/bin/awk '{print $NF}')
+  case "$value" in enabled|disabled) printf '%s' "$value" ;; esac
+}
+http=$(address_after 'HTTP proxy is listening on')
+socks=$(address_after 'SOCKS5 proxy is listening on')
+auto=$(word_after 'System-wide automatic filtering is')
+dns=$(word_after 'System-wide DNS filtering is')
+
+/usr/bin/jq -cn \
+  --arg unit "$unit" --arg active "$active" --arg enabled "$enabled" \
+  --argjson unitFound "$unit_found" --argjson proxyRunning "$proxy_running" \
+  --arg http "$http" --arg socks "$socks" --arg auto "$auto" --arg dns "$dns" \
   '{unit:$unit, active:$active, enabled:$enabled, unitFound:$unitFound,
     proxyRunning:$proxyRunning, http:$http, socks:$socks,
     autoFiltering:$auto, dnsFiltering:$dns}'

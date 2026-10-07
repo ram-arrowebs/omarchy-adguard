@@ -36,7 +36,10 @@ the next boot.
   still recognise the service-managed proxy. AdGuard keeps its state under
   `~/.local/share/adguard-cli`, so nothing needs root.
 
-Nothing else: `jq` and `systemctl` are already on a stock Omarchy install.
+Nothing else: `jq`, `systemctl` and the coreutils the helper uses are already
+on a stock Omarchy install. The helper looks for `adguard-cli` at
+`/usr/local/bin/adguard-cli` (where AdGuard's installer puts it) or
+`/usr/bin/adguard-cli`; it does not search `PATH`.
 
 ## Install
 
@@ -57,14 +60,18 @@ omarchy plugin enable ram.adguard --section right --before omarchy.network
 omarchy plugin update ram.adguard
 ```
 
-## Uninstall
+## Removing
 
 ```bash
 omarchy plugin remove ram.adguard
 ```
 
-The unit is yours and stays; `systemctl --user disable --now adguard-cli`
-if you no longer want the proxy either.
+That removes the widget and everything it installed, which is only its own
+directory. The plugin writes no files, so nothing of its own survives. The
+systemd unit at `~/.config/systemd/user/adguard-cli.service` is yours, created
+by you in the step above, and stays as it is; run
+`systemctl --user disable --now adguard-cli.service` and delete the file if
+you no longer want the proxy either. AdGuard CLI itself is untouched.
 
 ## Settings
 
@@ -102,13 +109,24 @@ bind = SUPER SHIFT, G, exec, omarchy-shell ram.adguard toggleService
 
 ## What it does on your system
 
-- **Commands it runs**: `systemctl --user is-active | is-enabled | start |
-  stop | restart | enable | disable <unit>`, `adguard-cli status`, and `jq`
-  (inside `bin/adguard-state`, which turns those into one JSON line).
-- **Privileges**: none beyond your own user. It never elevates.
-- **Files**: none. It writes nothing outside its own directory.
+- **Commands it runs**, all by fixed path under `/usr/bin` and as argv arrays:
+  `systemctl --user is-active | is-enabled | start | stop | restart | enable |
+  disable -- <unit>`, and `adguard-cli status` (read-only). Inside
+  `bin/adguard-state` the output of each is capped at 8 KiB, given a 10 s
+  deadline through `timeout`, filtered by `sed`, `grep` and `awk`, and turned
+  into one JSON line with `jq`. The shell side caps the helper's output again
+  and stops it with TERM then KILL if it outlives 30 s.
+- **Inputs it trusts**: the `unit` setting is accepted only when it is a plain
+  unit name ending in `.service`; otherwise the default is used. Every value
+  read back from systemd or AdGuard is matched against a short allowlist or an
+  address pattern before it is shown, and every text in the panel renders as
+  plain text.
+- **Privileges**: none beyond your own user. No `sudo`, no `pkexec`; `systemctl`
+  is only ever called with `--user`.
+- **Files**: none. It writes nothing, not even inside its own directory.
 - **Network**: none of its own. AdGuard's proxy is AdGuard's business.
-- **Background**: nothing. The state is polled from a timer in the shell.
+- **Background**: nothing. The state is polled from a timer in the shell, one
+  short-lived helper at a time.
 
 ## Security
 
