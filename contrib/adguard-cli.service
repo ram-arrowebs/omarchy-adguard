@@ -1,0 +1,14 @@
+[Unit]
+Description=AdGuard CLI ad-blocking proxy
+Documentation=https://adguard.com/kb/adguard-for-linux/
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/adguard-cli start --no-fork --pid-file %h/.local/share/adguard-cli/adguard.pid
+ExecStop=/usr/local/bin/adguard-cli stop
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

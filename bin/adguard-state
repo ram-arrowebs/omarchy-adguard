@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Prints one JSON object describing the adguard-cli user service and proxy.
+# Called by the bar widget's Service.qml on a timer and after every action.
+unit="${1:-adguard-cli.service}"
+
+active=$(systemctl --user is-active "$unit" 2>/dev/null || true)
+enabled=$(systemctl --user is-enabled "$unit" 2>/dev/null || true)
+unit_found=true
+if [[ -z "$enabled" || "$enabled" == "not-found" ]]; then
+  unit_found=false
+fi
+
+status=$(adguard-cli status 2>/dev/null | sed 's/\x1b\[[0-9;]*m//g' || true)
+proxy_running=false
+[[ "$status" == *"is running"* ]] && proxy_running=true
+http=$(grep -oE 'HTTP proxy is listening on [^ ]+' <<<"$status" | awk '{print $NF}')
+socks=$(grep -oE 'SOCKS5 proxy is listening on [^ ]+' <<<"$status" | awk '{print $NF}')
+auto=$(grep -oE 'System-wide automatic filtering is [a-z]+' <<<"$status" | awk '{print $NF}')
+dns=$(grep -oE 'System-wide DNS filtering is [a-z]+' <<<"$status" | awk '{print $NF}')
+
+jq -cn \
+  --arg unit "$unit" \
+  --arg active "${active:-unknown}" \
+  --arg enabled "${enabled:-unknown}" \
+  --argjson unitFound "$unit_found" \
+  --argjson proxyRunning "$proxy_running" \
+  --arg http "$http" --arg socks "$socks" \
+  --arg auto "$auto" --arg dns "$dns" \
+  '{unit:$unit, active:$active, enabled:$enabled, unitFound:$unitFound,
+    proxyRunning:$proxyRunning, http:$http, socks:$socks,
+    autoFiltering:$auto, dnsFiltering:$dns}'

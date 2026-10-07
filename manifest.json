@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "ram.adguard",
+  "name": "AdGuard",
+  "version": "1.0.0",
+  "author": "ram",
+  "license": "MIT",
+  "description": "AdGuard CLI status in the bar: shows whether the ad-blocking proxy is running, toggles the user service, and controls whether it starts at boot.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "AdGuard",
+    "description": "Start or stop the AdGuard CLI proxy service and choose whether it starts on the next boot.",
+    "category": "Network",
+    "aliases": [
+      "adguard",
+      "adblock",
+      "ad blocker",
+      "proxy"
+    ],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "unit": "adguard-cli.service",
+      "refreshIntervalSec": 10
+    },
+    "schema": [
+      {
+        "key": "unit",
+        "type": "string",
+        "label": "systemd user unit",
+        "description": "Name of the user-level systemd unit that runs adguard-cli.",
+        "defaultValue": "adguard-cli.service"
+      },
+      {
+        "key": "refreshIntervalSec",
+        "type": "integer",
+        "label": "Refresh interval (seconds)",
+        "min": 3,
+        "max": 600,
+        "step": 1,
+        "defaultValue": 10
+      }
+    ]
+  }
+}
